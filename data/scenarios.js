@@ -1,76 +1,37 @@
 /**
  * scenarios.js
  * ----------------------------
- * Defines umpire mechanics scenarios for NCAA 2-umpire crews.
- * Each scenario contains steps with positions and instructional overlays.
+ * Scenario definitions
+ * - Provides initial scenario configurations for mechanics playback.
+ * - Each scenario references player positions by ID.
+ * - Coordinates are expressed as percentages of the field width/height (0–100).
  */
 
-export const scenarios = {
-  noRunners: {
-    code: 'NCAA',
-    crewSize: 2,
-    situation: 'No Runners on Base – Starting Positions',
-    steps: [
-      {
-        step: 1,
-        description: 'Starting positions for 2-umpire crew.',
-        positions: {
-          PU: { top: 580, left: 180 },
-          U1: { top: 420, left: 320 },
-        },
-        overlays: [
-          { text: 'PU starts behind the plate.', top: 560, left: 200 },
-          { text: 'U1 starts in the A position.', top: 440, left: 340 },
-        ],
+export const allScenarios = {
+  exampleScenario: {
+    description: 'Runner on first, ground ball to shortstop',
+    players: {
+      defense: {
+        SS: { xPct: 35, yPct: 35 },
+        '1B': { xPct: 65, yPct: 60 },
+        P: { xPct: 45, yPct: 50 },
+        C: { xPct: 50, yPct: 50 },
       },
-    ],
-  },
-  runnerOnFirst: {
-    code: 'NCAA',
-    crewSize: 2,
-    situation: 'Runner on First – Starting Positions',
-    steps: [
-      {
-        step: 1,
-        description: 'U1 moves to B position.',
-        positions: {
-          PU: { top: 580, left: 180 },
-          U1: { top: 360, left: 240 },
-        },
-        overlays: [{ text: 'U1 moves to B position.', top: 380, left: 260 }],
+      offense: {
+        R1: { xPct: 70, yPct: 70 },
+        BR: { xPct: 55, yPct: 95 },
       },
-    ],
-  },
-  doublePlay: {
-    code: 'NCAA',
-    crewSize: 2,
-    situation: 'Double Play – Movement',
-    steps: [
-      {
-        step: 1,
-        description: 'U1 rotates to second base.',
-        positions: {
-          PU: { top: 580, left: 180 },
-          U1: { top: 360, left: 120 },
-        },
-        overlays: [{ text: 'U1 rotates to second.', top: 340, left: 140 }],
+      umpires: {
+        PU: { xPct: 52, yPct: 45 },
+        U1: { xPct: 75, yPct: 75 },
       },
-    ],
-  },
-  flyBallCoverage: {
-    code: 'NCAA',
-    crewSize: 2,
-    situation: 'Fly Ball Coverage – Outfield',
-    steps: [
-      {
-        step: 1,
-        description: 'PU watches tag-up, U1 covers catch.',
-        positions: {
-          PU: { top: 580, left: 180 },
-          U1: { top: 260, left: 320 },
-        },
-        overlays: [{ text: 'U1 covers catch in RF.', top: 240, left: 340 }],
-      },
-    ],
+    },
   },
 };
+
+/**
+ * Returns the full scenarios object.
+ */
+export function getAllScenarios() {
+  return allScenarios;
+}

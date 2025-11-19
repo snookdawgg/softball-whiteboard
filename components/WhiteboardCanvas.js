@@ -1,195 +1,220 @@
 /**
- * WhiteboardCanvas.js
- * ----------------------------
- * Renders the softball field background, draggable player icons,
- * and sketch layer for drawing paths.
- * - Receives `allPlayers` array and manages pan responders.
- * - Provides Reset and Clear Sketch controls.
- * - Exposes sketch toggle (✏️) to enable/disable drawing.
+ * components/WhiteboardCanvas.js
+ * ----------------------------------------------------------------------------
+ * Purpose:
+ *   Gesture-driven softball whiteboard canvas using react-native-gesture-handler.
+ *
+ * Fixes:
+ *   - Prevent duplicate arrowheads by rendering head only on finalized arrows.
+ *   - During arrow drawing: show a live line (no head). On release: commit arrow with head.
+ *   - Icons are draggable when pen is disabled. Drawing overlay does not block UI buttons.
  */
 
-import React, { useMemo, useRef, useState } from 'react';
-import {
-  StyleSheet,
-  View,
-  Image,
-  Animated,
-  PanResponder,
-  Text,
-  TouchableOpacity,
-} from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Image, StyleSheet, useWindowDimensions } from 'react-native';
+import Svg, { Path, Line, Polygon } from 'react-native-svg';
+import { PanGestureHandler, State } from 'react-native-gesture-handler';
+import PlayerIcon from './PlayerIcon';
+import { getAllPlayers } from '../data/players';
 
-export default function WhiteboardCanvas({ allPlayers }) {
-  // Draggable players
-  const panRefs = useMemo(
-    () => allPlayers.map(p => new Animated.ValueXY({ x: p.left, y: p.top })),
-    [allPlayers]
+export default function WhiteboardCanvas({
+  allPlayers,
+  penEnabled = true,
+  drawMode = 'freehand',
+  resetFlag,
+  clearFlag,
+  onResetHandled,
+  onClearHandled,
+}) {
+  const { width, height } = useWindowDimensions();
+
+  const [playersState, setPlayersState] = useState(allPlayers || getAllPlayers());
+  const [paths, setPaths] = useState([]);
+  const [arrows, setArrows] = useState([]);
+
+  // Live drawing refs
+  const currentPath = useRef(null);
+  const tempArrow = useRef(null); // live arrow without head
+  const isArrowDrawing = useRef(false);
+
+  useEffect(() => {
+    if (resetFlag) {
+      setPlayersState(getAllPlayers());
+      setPaths([]);
+      setArrows([]);
+      currentPath.current = null;
+      tempArrow.current = null;
+      isArrowDrawing.current = false;
+      onResetHandled && onResetHandled();
+    }
+  }, [resetFlag]);
+
+  useEffect(() => {
+    if (clearFlag) {
+      setPaths([]);
+      setArrows([]);
+      currentPath.current = null;
+      tempArrow.current = null;
+      isArrowDrawing.current = false;
+      onClearHandled && onClearHandled();
+    }
+  }, [clearFlag]);
+
+  const onCanvasGestureEvent = useMemo(
+    () => (event) => {
+      const x = event.nativeEvent.absoluteX;
+      const y = event.nativeEvent.absoluteY;
+
+      if (drawMode === 'freehand' && currentPath.current) {
+        currentPath.current.push(`L${x},${y}`);
+        setPaths((prev) => {
+          const next = [...prev];
+          next[next.length - 1] = [...currentPath.current];
+          return next;
+        });
+      } else if (drawMode === 'arrow' && isArrowDrawing.current && tempArrow.current) {
+        tempArrow.current.x2 = x;
+        tempArrow.current.y2 = y;
+        // No state update here for performance; we render tempArrow directly
+      }
+    },
+    [drawMode]
   );
 
-  const responders = panRefs.map(pan =>
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        pan.setOffset({ x: pan.x._value, y: pan.y._value });
-        pan.setValue({ x: 0, y: 0 });
-      },
-      onPanResponderMove: Animated.event([null, { dx: pan.x, dy: pan.y }], {
-        useNativeDriver: false,
-      }),
-      onPanResponderRelease: () => pan.flattenOffset(),
-    })
+  const onCanvasHandlerStateChange = useMemo(
+    () => (event) => {
+      const x = event.nativeEvent.absoluteX;
+      const y = event.nativeEvent.absoluteY;
+      const { state } = event.nativeEvent;
+
+      if (state === State.BEGAN) {
+        if (drawMode === 'freehand') {
+          currentPath.current = [`M${x},${y}`];
+          setPaths((prev) => [...prev, currentPath.current]);
+        } else {
+          isArrowDrawing.current = true;
+          tempArrow.current = { x1: x, y1: y, x2: x, y2: y };
+        }
+      } else if (state === State.END || state === State.CANCELLED || state === State.FAILED) {
+        if (drawMode === 'freehand') {
+          currentPath.current = null;
+        } else if (isArrowDrawing.current && tempArrow.current) {
+          // Finalize arrow: commit a single arrow with head
+          const finalizedArrow = { ...tempArrow.current, x2: x, y2: y };
+          setArrows((prev) => [...prev, finalizedArrow]);
+          // Clear live state
+          isArrowDrawing.current = false;
+          tempArrow.current = null;
+        }
+      }
+    },
+    [drawMode]
   );
 
-  const resetPositions = () => {
-    allPlayers.forEach((player, i) => {
-      panRefs[i].setValue({ x: player.left, y: player.top });
-      panRefs[i].setOffset({ x: 0, y: 0 });
+  const updatePlayerPctPosition = (id, groupName, nextLeftPx, nextTopPx) => {
+    const xPct = (nextLeftPx / width) * 100;
+    const yPct = (nextTopPx / height) * 100;
+    setPlayersState((prev) => {
+      const next = { ...prev, [groupName]: { ...prev[groupName] } };
+      next[groupName][id] = { ...prev[groupName][id], xPct, yPct };
+      return next;
     });
   };
 
-  // Sketching
-  const [paths, setPaths] = useState([]);
-  const currentPath = useRef('');
-  const [sketchEnabled, setSketchEnabled] = useState(true);
-
-  const sketchResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => sketchEnabled,
-        onPanResponderGrant: e => {
-          const { locationX, locationY } = e.nativeEvent;
-          currentPath.current = `M${locationX},${locationY}`;
-        },
-        onPanResponderMove: e => {
-          const { locationX, locationY } = e.nativeEvent;
-          currentPath.current += ` L${locationX},${locationY}`;
-          setPaths(prev => [...prev, currentPath.current]);
-        },
-        onPanResponderRelease: () => {
-          setPaths(prev => [...prev, currentPath.current]);
-          currentPath.current = '';
-        },
-      }),
-    [sketchEnabled]
-  );
-
-  const clearSketch = () => setPaths([]);
-
   return (
-    <View style={styles.canvasContainer}>
+    <View style={styles.container}>
       {/* Field background */}
       <Image
-        source={{
-          uri: 'https://drive.google.com/uc?export=view&id=1PLUpdkIlfhLeXr58gwtFeV056JaVLPOh',
-        }}
+        source={{ uri: 'https://drive.google.com/uc?export=view&id=1PLUpdkIlfhLeXr58gwtFeV056JaVLPOh' }}
         style={styles.field}
         resizeMode="contain"
+        pointerEvents="none"
       />
 
-      {/* Sketch layer */}
-      <View style={StyleSheet.absoluteFill} {...sketchResponder.panHandlers}>
-        <Svg style={StyleSheet.absoluteFill}>
-          {paths.map((d, i) => (
-            <Path key={i} d={d} stroke="yellow" strokeWidth={3} fill="none" />
-          ))}
-        </Svg>
+      {/* Player icons */}
+      <View style={styles.iconsLayer}>
+        {Object.entries(playersState).flatMap(([groupName, group]) =>
+          Object.entries(group).map(([id, pos]) => {
+            const type = groupName === 'umpires' ? 'umpire' : groupName;
+            const left = (pos.xPct / 100) * width;
+            const top = (pos.yPct / 100) * height;
+            return (
+              <PlayerIcon
+                key={id}
+                id={id}
+                type={type}
+                x={left}
+                y={top}
+                label={id}
+                dragEnabled={!penEnabled}
+                onDragEnd={(leftPx, topPx) => updatePlayerPctPosition(id, groupName, leftPx, topPx)}
+              />
+            );
+          })
+        )}
       </View>
 
-      {/* Players */}
-      {allPlayers.map((player, index) => {
-        const isOffensive = ['BR', 'R1', 'R2', 'R3'].includes(player.label);
-        const isUmpire = ['PU', 'U1', 'U2', 'U3'].includes(player.label);
-        const style = isOffensive
-          ? styles.offensiveIcon
-          : isUmpire
-          ? styles.umpireIcon
-          : styles.defensiveIcon;
+      {/* Drawing overlay (only when pen is enabled) */}
+      {penEnabled && (
+        <PanGestureHandler
+          onGestureEvent={onCanvasGestureEvent}
+          onHandlerStateChange={onCanvasHandlerStateChange}
+        >
+          <View style={styles.overlay} pointerEvents="box-none">
+            <Svg style={StyleSheet.absoluteFill}>
+              {/* Freehand paths */}
+              {paths.map((commands, idx) => (
+                <Path
+                  key={`path-${idx}`}
+                  d={commands.join(' ')}
+                  stroke="yellow"
+                  strokeWidth={6}
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  fill="none"
+                />
+              ))}
 
-        return (
-          <Animated.View
-            key={player.label}
-            style={[style, { transform: panRefs[index].getTranslateTransform() }]}
-            {...responders[index].panHandlers}
-          >
-            <Text style={styles.iconText}>{player.label}</Text>
-          </Animated.View>
-        );
-      })}
+              {/* Finalized arrows (line + head) */}
+              {arrows.map((arrow, idx) => {
+                const { x1, y1, x2, y2 } = arrow;
+                if ([x1, y1, x2, y2].some((v) => typeof v !== 'number' || isNaN(v))) return null;
+                const headSize = 14;
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                const hx1 = x2 - headSize * Math.cos(angle - Math.PI / 6);
+                const hy1 = y2 - headSize * Math.sin(angle - Math.PI / 6);
+                const hx2 = x2 - headSize * Math.cos(angle + Math.PI / 6);
+                const hy2 = y2 - headSize * Math.sin(angle + Math.PI / 6);
+                return (
+                  <React.Fragment key={`arrow-${idx}`}>
+                    <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke="blue" strokeWidth={6} />
+                    <Polygon points={`${x2},${y2} ${hx1},${hy1} ${hx2},${hy2}`} fill="blue" />
+                  </React.Fragment>
+                );
+              })}
 
-      {/* Controls */}
-      <View style={styles.buttonRow}>
-        <TouchableOpacity style={styles.button} onPress={resetPositions}>
-          <Text style={styles.buttonText}>Reset</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.button} onPress={clearSketch}>
-          <Text style={styles.buttonText}>Clear Sketch</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={() => setSketchEnabled(prev => !prev)}>
-          <Text
-            style={[
-              styles.pencilIcon,
-              sketchEnabled ? styles.pencilActive : styles.pencilInactive,
-            ]}
-          >
-            ✏️
-          </Text>
-        </TouchableOpacity>
-      </View>
+              {/* Live arrow (line only, no head) */}
+              {isArrowDrawing.current && tempArrow.current && (
+                <Line
+                  x1={tempArrow.current.x1}
+                  y1={tempArrow.current.y1}
+                  x2={tempArrow.current.x2}
+                  y2={tempArrow.current.y2}
+                  stroke="blue"
+                  strokeWidth={6}
+                />
+              )}
+            </Svg>
+          </View>
+        </PanGestureHandler>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  canvasContainer: { flex: 1, position: 'relative' },
-  field: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-
-  defensiveIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#555',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    borderRadius: 4,
-  },
-  offensiveIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#c0392b',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    borderRadius: 20,
-  },
-  umpireIcon: {
-    width: 40,
-    height: 40,
-    backgroundColor: '#2980b9',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'absolute',
-    borderRadius: 4,
-  },
-  iconText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
-
-  buttonRow: {
-    position: 'absolute',
-    bottom: 40,
-    right: 20,
-    flexDirection: 'row',
-    gap: 10,
-    alignItems: 'center',
-  },
-  button: {
-    backgroundColor: '#333',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 6,
-  },
-  buttonText: { color: '#fff', fontWeight: 'bold', fontSize: 14 },
-
-  pencilIcon: { fontSize: 24, padding: 10, borderRadius: 6 },
-  pencilActive: { backgroundColor: '#27ae60', color: '#fff' },
-  pencilInactive: { backgroundColor: '#7f8c8d', color: '#fff' },
+  container: { flex: 1, position: 'relative' },
+  field: { position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 },
+  iconsLayer: { ...StyleSheet.absoluteFillObject, zIndex: 10 },
+  overlay: { ...StyleSheet.absoluteFillObject, zIndex: 20 },
 });

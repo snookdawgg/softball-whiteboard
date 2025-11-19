@@ -54,6 +54,23 @@ Items marked as **[placeholder]** are not part of v1 but are planned for later i
    - Add onboarding tooltips for new users.  
    - Consider a “dark mode” or theme toggle for better visibility outdoors.
 
+### Backlog Item: Local Fallback Field Background
+
+**Context:**  
+Currently the field background is loaded from a Google Drive URI. This requires internet access and correct sharing permissions. To ensure offline reliability and avoid runtime errors when the remote asset is unavailable, we need a bundled local fallback image.
+
+**Task:**  
+- Create an `assets/` folder at the root of the project.  
+- Add a placeholder `field.png` image to that folder.  
+- Update `WhiteboardCanvas.js` to use the Google Drive URI as the primary source, but fallback to the local asset if the remote fails.  
+  - On iOS: use `defaultSource={require('../assets/field.png')}`.  
+  - On Android: implement `onError` to swap to the local image manually.
+
+**Priority:** Medium  
+**Dependencies:** None (can be implemented independently of mechanics logic).  
+**Notes:**  
+This ensures resilience in environments without internet access and provides a baseline visual even if the remote asset is unavailable.
+
 ---
 
 ## 🎯 Priorities

@@ -1,38 +1,41 @@
 /**
  * players.js
  * ----------------------------
- * Defines initial positions for defensive, offensive, and umpire players.
- * Exports a combined `allPlayers` array for use in WhiteboardCanvas.
+ * Player definitions
+ * - Provides initial positions for offensive, defensive, and umpire players.
+ * - Coordinates are expressed as percentages of the field width/height (0–100).
+ * - This ensures icons scale consistently with the background image.
  */
 
-export const defensivePlayers = [
-  { label: 'C', top: 550, left: 180 },
-  { label: 'P', top: 420, left: 180 },
-  { label: '1B', top: 440, left: 260 },
-  { label: '2B', top: 360, left: 240 },
-  { label: 'SS', top: 360, left: 120 },
-  { label: '3B', top: 440, left: 100 },
-  { label: 'LF', top: 260, left: 40 },
-  { label: 'CF', top: 180, left: 180 },
-  { label: 'RF', top: 260, left: 320 },
-];
+export const allPlayers = {
+  defense: {
+    C:   { xPct: 46, yPct: 58 },
+    P:   { xPct: 46, yPct: 48 },
+    '1B':{ xPct: 61, yPct: 45 },
+    '2B':{ xPct: 55, yPct: 40 },
+    SS:  { xPct: 35, yPct: 40 },
+    '3B':{ xPct: 31, yPct: 45 },
+    LF:  { xPct: 10, yPct: 24 },
+    CF:  { xPct: 46, yPct: 15 },
+    RF:  { xPct: 84, yPct: 24 },
+  },
+  offense: {
+    BR: { xPct: 10, yPct: 75 },
+    R1: { xPct: 20, yPct: 75 },
+    R2: { xPct: 30, yPct: 75 },
+    R3: { xPct: 40, yPct: 75 },
+  },
+  umpires: {
+    PU: { xPct: 46, yPct: 61 },
+    U1: { xPct: 79, yPct: 43 },
+    U2: { xPct: 46, yPct: 30 },
+    U3: { xPct: 14, yPct: 43 },
+  },
+};
 
-export const offensivePlayers = [
-  { label: 'BR', top: 680, left: 20 },
-  { label: 'R1', top: 720, left: 20 },
-  { label: 'R2', top: 680, left: 60 },
-  { label: 'R3', top: 720, left: 60 },
-];
-
-export const umpirePlayers = [
-  { label: 'PU', top: 580, left: 180 },
-  { label: 'U1', top: 420, left: 320 },
-  { label: 'U2', top: 300, left: 180 },
-  { label: 'U3', top: 420, left: 40 },
-];
-
-export const allPlayers = [
-  ...defensivePlayers,
-  ...offensivePlayers,
-  ...umpirePlayers,
-];
+/**
+ * Returns the full players object.
+ */
+export function getAllPlayers() {
+  return allPlayers;
+}
