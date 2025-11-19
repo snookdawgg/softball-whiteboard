@@ -1,8 +1,22 @@
+/**
+ * index.js
+ * ----------------------------
+ * Entry point for Expo managed workflow.
+ * Wraps the root <App /> component in SafeAreaProvider
+ * so SafeAreaView and useSafeAreaInsets have context.
+ * Uses Expo's registerRootComponent instead of AppRegistry.
+ */
+
 import { registerRootComponent } from 'expo';
-
 import App from './App';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-// registerRootComponent calls AppRegistry.registerComponent('main', () => App);
-// It also ensures that whether you load the app in Expo Go or in a native build,
-// the environment is set up appropriately
-registerRootComponent(App);
+function Root() {
+  return (
+    <SafeAreaProvider>
+      <App />
+    </SafeAreaProvider>
+  );
+}
+
+registerRootComponent(Root);
