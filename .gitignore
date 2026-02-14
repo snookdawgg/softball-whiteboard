@@ -56,3 +56,7 @@ coverage/
 *.key
 *.mobileprovision
 *.orig.*
+
+# Ignore screenshots
+*.png
+screenshots/
